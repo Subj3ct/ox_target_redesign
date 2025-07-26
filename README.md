@@ -34,6 +34,7 @@ To improve many design flaws, ox_target has been written from scratch and drops 
     subtitle = 'With subtitle support',
     priority = true, -- Highlights important options
     animation = 'pulse 2s infinite', -- Custom icon animations
+    submenu = {} (optional)
     onSelect = function(data)
         -- Your action here
     end
