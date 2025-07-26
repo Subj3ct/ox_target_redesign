@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css" />
+    <link href="style.css" rel="stylesheet" type="text/css" />
+    <title>ox_target</title>
+  </head>
+  <body>
+    <!-- Target Icon Container -->
+    <div id="eye" class="animate-fade-in">
+      <svg id="eyeSvg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor">
+        <!-- Outer ring -->
+        <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.6"/>
+        <!-- Middle ring -->
+        <circle cx="12" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.8"/>
+        <!-- Inner circle -->
+        <circle cx="12" cy="12" r="2" fill="currentColor"/>
+        <!-- Crosshair lines -->
+        <line x1="12" y1="2" x2="12" y2="6" stroke="currentColor" stroke-width="1.5" opacity="0.6"/>
+        <line x1="12" y1="18" x2="12" y2="22" stroke="currentColor" stroke-width="1.5" opacity="0.6"/>
+        <line x1="2" y1="12" x2="6" y2="12" stroke="currentColor" stroke-width="1.5" opacity="0.6"/>
+        <line x1="18" y1="12" x2="22" y2="12" stroke="currentColor" stroke-width="1.5" opacity="0.6"/>
+      </svg>
+    </div>
+    
+    <!-- Options Container -->
+    <div id="options-wrapper"></div>
+    
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script defer src="js/main.js"></script>
+  </body>
+</html>
