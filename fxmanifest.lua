@@ -21,7 +21,6 @@ shared_scripts {
 client_scripts {
 	'client/config.lua',
 	'client/main.lua',
-	'client/enhanced_api.lua',
 }
 
 server_scripts {
