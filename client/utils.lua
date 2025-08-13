@@ -37,7 +37,6 @@ local drawZoneSprites = GetConvarInt('ox_target:drawSprite', 24)
 local SetDrawOrigin = SetDrawOrigin
 local DrawSprite = DrawSprite
 local ClearDrawOrigin = ClearDrawOrigin
--- Function to get ox_lib theme color for sprites
 local function getOxLibSpriteColor()
     local primaryColor = GetConvar('ox:primaryColor', 'blue')
     local primaryShade = GetConvarInt('ox:primaryShade', 6)

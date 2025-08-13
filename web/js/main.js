@@ -14,8 +14,11 @@ async function fetchNui(eventName, data) {
 
 const optionsWrapper = document.getElementById("options-wrapper");
 const body = document.body;
-const eye = document.getElementById("eye");
+const pointer = document.getElementById("pointer");
+const pointerLeader = pointer?.querySelector('.pointer-leader');
+const diamondSvg = document.getElementById('diamondSvg');
 const html = document.documentElement;
+const LEADER_PADDING = 10; // pixels to stop short of the base menu edge
 
 let currentTheme = 'dark';
 
@@ -77,6 +80,126 @@ let isAnimatingOut = false;
 
 let activeSubmenu = null;
 let submenuHoverState = false;
+
+// Selection state
+let selectedIndex = -1;
+let optionNodes = [];
+let allowSelect = false;
+let hasFocus = false;
+let currentContainer = optionsWrapper;
+let isInSubmenu = false;
+let submenuOwnerOption = null;
+let lastScrollDir = 0;
+
+function updatePointerVisibility(visible) {
+  if (!pointer) return;
+  if (visible) {
+    pointer.style.opacity = '1';
+  } else {
+    pointer.style.opacity = '0';
+  }
+}
+
+function positionPointerAtCenter(animate = false) {
+  if (!pointer) return;
+  const diamondWidth = diamondSvg?.getBoundingClientRect().width || 18;
+  const centerX = window.innerWidth / 2 - diamondWidth / 2;
+  const centerY = window.innerHeight / 2 - (pointer.getBoundingClientRect().height / 2);
+  pointer.style.left = centerX + 'px';
+  pointer.style.top = centerY + 'px';
+
+  const wrapperRect = optionsWrapper.getBoundingClientRect();
+  if (pointerLeader) {
+    if (!optionNodes.length) {
+      pointerLeader.style.width = '0px';
+      pointerLeader.style.opacity = '0';
+    } else {
+      const gap = Math.max(0, wrapperRect.left - (window.innerWidth / 2 + diamondWidth / 2) - LEADER_PADDING);
+      pointerLeader.style.opacity = '0.9';
+      pointerLeader.style.width = gap + 'px';
+    }
+  }
+}
+
+function setSelectedIndex(newIndex, animate = true) {
+  if (!optionNodes.length) return;
+  const len = optionNodes.length;
+  newIndex = ((newIndex % len) + len) % len;
+  const prev = selectedIndex;
+  if (selectedIndex === newIndex) return;
+
+  if (selectedIndex >= 0 && optionNodes[selectedIndex]) {
+    optionNodes[selectedIndex].classList.remove('selected');
+  }
+
+  selectedIndex = newIndex;
+  const target = optionNodes[selectedIndex];
+  target.classList.add('selected');
+
+  const diamondWidth = diamondSvg?.getBoundingClientRect().width || 18;
+  const centerX = window.innerWidth / 2 - diamondWidth / 2;
+  const leader = pointer.querySelector('.pointer-leader');
+  if (leader) {
+    const wrapperRect = optionsWrapper.getBoundingClientRect();
+    const gap = Math.max(0, (wrapperRect.left - (window.innerWidth / 2 + diamondWidth / 2) - LEADER_PADDING));
+    leader.style.opacity = '0.9';
+    leader.style.width = gap + 'px';
+  }
+
+  pointer.style.left = centerX + 'px';
+  pointer.style.transform = 'none';
+
+  const wrappedForward = prev === len - 1 && newIndex === 0 && lastScrollDir === 1;
+  const wrappedBackward = prev === 0 && newIndex === len - 1 && lastScrollDir === -1;
+  centerOnSelected(animate, 0.1, wrappedForward || wrappedBackward);
+}
+
+function centerOnSelected(animate = true, duration = 0.1, forceAbsolute = false) {
+  if (!currentContainer || !optionNodes[selectedIndex]) return;
+  const selected = optionNodes[selectedIndex];
+  const selectedRect = selected.getBoundingClientRect();
+  const containerRect = currentContainer.getBoundingClientRect();
+  const pointerCenterY = window.innerHeight / 2;
+  const selectedCenterY = selectedRect.top + selectedRect.height / 2;
+  const currentY = (() => {
+    const m = /translateY\((-?\d+(?:\.\d+)?)px\)/.exec(currentContainer.style.transform || '');
+    return m ? parseFloat(m[1]) : 0;
+  })();
+  let targetY;
+  if (forceAbsolute) {
+    targetY = currentY + (pointerCenterY - selectedCenterY);
+  } else {
+    const rowH = selectedRect.height + (parseInt(getComputedStyle(document.documentElement).getPropertyValue('--option-spacing')||'8'));
+    targetY = currentY + (pointerCenterY - selectedCenterY);
+    targetY = Math.max(currentY - rowH, Math.min(currentY + rowH, targetY));
+  }
+  const delta = Math.round(targetY - currentY);
+
+  if (animate && window.gsap) {
+    gsap.to(currentContainer, { y: currentY + delta, duration, ease: 'power2.out', onUpdate() {
+      const val = this.targets()[0].style.transform.match(/translateY\((-?\d+(?:\.\d+)?)px\)/);
+      if (!val) this.targets()[0].style.transform = `translateY(${currentY + delta}px)`;
+    }, onComplete() {
+      currentContainer.style.transform = `translateY(${currentY + delta}px)`;
+    }});
+  } else {
+    currentContainer.style.transform = `translateY(${currentY + delta}px)`;
+  }
+}
+
+function chooseSelected() {
+  const target = optionNodes[selectedIndex];
+  if (!target) return;
+  if (target.submenuData) {
+    openSubmenu(target);
+  } else {
+    fetchNui("select", [
+      target.targetType,
+      target.targetId,
+      target.zoneId
+    ]);
+  }
+}
 
 function createOptions(type, data, id, zoneId, index = 0) {
   if (data.hide) return;
@@ -140,6 +263,7 @@ function createOptions(type, data, id, zoneId, index = 0) {
   }
   
   option.submenuData = data.submenu;
+  option.__optionData = data;
   
   option.addEventListener('click', onClick);
   
@@ -148,10 +272,13 @@ function createOptions(type, data, id, zoneId, index = 0) {
   
   optionsWrapper.appendChild(option);
   
-  gsap.fromTo(option, 
-    { opacity: 0, x: 30, scale: 0.9 },
-    { opacity: 1, x: 0, scale: 1, duration: 0.25, delay: 0.05 * index, ease: "power2.out" }
-  );
+  if (window.gsap) {
+    gsap.fromTo(option,
+      { opacity: 0, x: 10 },
+      { opacity: 1, x: 0, duration: 0.08, ease: 'power1.out' }
+    );
+  }
+
 }
 
 function createIconElement(data) {
@@ -203,6 +330,8 @@ function onClick(event) {
   
   addRippleEffect(event);
   
+  if (!hasFocus || !allowSelect) return;
+
   option.style.pointerEvents = 'none';
   setTimeout(() => {
     option.style.pointerEvents = '';
@@ -225,6 +354,9 @@ function openSubmenu(option) {
   
   const submenuContainer = document.createElement("div");
   submenuContainer.className = "submenu-container";
+  const list = document.createElement('div');
+  list.className = 'submenu-list';
+  list.style.overflow = 'visible';
   
   let submenuItems = option.submenuData;
   if (typeof submenuItems === 'function') {
@@ -273,7 +405,7 @@ function openSubmenu(option) {
       closeSubmenu();
     });
     
-    submenuContainer.appendChild(submenuOption);
+    list.appendChild(submenuOption);
   });
   
   const optionRect = option.getBoundingClientRect();
@@ -286,9 +418,8 @@ function openSubmenu(option) {
     left = optionRect.left - submenuRect.width - 8;
   }
   
-  if (top + submenuRect.height > window.innerHeight) {
-    top = window.innerHeight - submenuRect.height - 8;
-  }
+  top = Math.min(top, window.innerHeight - 40);
+  top = Math.max(8, top);
   
   submenuContainer.style.position = 'fixed';
   submenuContainer.style.left = left + 'px';
@@ -296,6 +427,7 @@ function openSubmenu(option) {
   submenuContainer.style.transform = 'scale(0.95) translateY(-10px)';
   submenuContainer.style.opacity = '0';
   
+  submenuContainer.appendChild(list);
   document.body.appendChild(submenuContainer);
   
   requestAnimationFrame(() => {
@@ -323,7 +455,16 @@ function openSubmenu(option) {
       closeSubmenu();
     }, 100);
   });
-  
+  isInSubmenu = true;
+  currentContainer = list;
+  submenuOwnerOption = option;
+  optionNodes = Array.from(list.querySelectorAll('.submenu-option'));
+  selectedIndex = 0;
+  optionNodes.forEach(n => n.classList.remove('selected'));
+  if (optionNodes[0]) optionNodes[0].classList.add('selected');
+  list.style.transform = 'translateY(0px)';
+  positionPointerAtCenter(false);
+  centerOnSelected(false);
 }
 
 function closeSubmenu() {
@@ -342,8 +483,60 @@ function closeSubmenu() {
       existingSubmenu.remove();
       activeSubmenu = null;
       submenuHoverState = false;
+      isInSubmenu = false;
+      currentContainer = optionsWrapper;
+      submenuOwnerOption = null;
+      optionNodes = Array.from(optionsWrapper.querySelectorAll('.option-container'));
+      selectedIndex = optionNodes.length > 0 ? 0 : -1;
+      optionNodes.forEach(n => n.classList.remove('selected'));
+      if (optionNodes[0]) optionNodes[0].classList.add('selected');
+      positionPointerAtCenter(false);
     }, 200);
   }
+}
+
+function rotateOptions(direction) {
+  if (!currentContainer) return;
+  const nodes = Array.from(currentContainer.children);
+  if (nodes.length <= 1) return;
+
+  const first = nodes[0];
+  const rowHeight = first.getBoundingClientRect().height;
+  const styles = getComputedStyle(document.documentElement);
+  const gap = parseInt(styles.getPropertyValue('--option-spacing') || '8');
+  const shift = rowHeight + gap;
+
+  const startRects = nodes.map(n => n.getBoundingClientRect());
+
+  if (direction === 'down') {
+    currentContainer.appendChild(first);
+  } else {
+    const last = nodes[nodes.length - 1];
+    currentContainer.insertBefore(last, currentContainer.firstChild);
+  }
+
+  const endRects = Array.from(currentContainer.children).map(n => n.getBoundingClientRect());
+  Array.from(currentContainer.children).forEach((node, i) => {
+    const dy = startRects[i].top - endRects[i].top;
+    if (dy) {
+      node.style.transform = `translateY(${dy}px)`;
+      node.style.willChange = 'transform';
+      node.style.transition = 'transform 160ms cubic-bezier(0.4, 0, 0.2, 1)';
+      requestAnimationFrame(() => {
+        node.style.transform = '';
+      });
+      node.addEventListener('transitionend', () => {
+        node.style.transition = '';
+        node.style.willChange = '';
+      }, { once: true });
+    }
+  });
+
+  optionNodes = Array.from(currentContainer.children);
+  optionNodes.forEach(n => n.classList.remove('selected'));
+  if (optionNodes[0]) optionNodes[0].classList.add('selected');
+
+  centerOnSelected(false);
 }
 
 window.addEventListener("message", (event) => {
@@ -356,6 +549,9 @@ window.addEventListener("message", (event) => {
         body.style.visibility = "visible";
         body.style.opacity = "1";
         isAnimatingOut = false;
+        updatePointerVisibility(true);
+        optionsWrapper.style.transform = 'translateY(0px)';
+        positionPointerAtCenter(false);
       } else {
         const options = optionsWrapper.querySelectorAll('.option-container');
         if (options.length > 0) {
@@ -367,18 +563,27 @@ window.addEventListener("message", (event) => {
             body.style.visibility = "hidden";
             body.style.opacity = "0";
             optionsWrapper.innerHTML = "";
+            optionNodes = [];
+            selectedIndex = -1;
+            optionsWrapper.style.transform = 'translateY(0px)';
+            document.querySelectorAll('.submenu-list').forEach(el => el.style.transform = 'translateY(0px)');
+            updatePointerVisibility(false);
           }, 200);
         } else {
           body.style.visibility = "hidden";
           body.style.opacity = "0";
           optionsWrapper.innerHTML = "";
+          optionNodes = [];
+          selectedIndex = -1;
+          optionsWrapper.style.transform = 'translateY(0px)';
+          document.querySelectorAll('.submenu-list').forEach(el => el.style.transform = 'translateY(0px)');
+          updatePointerVisibility(false);
         }
       }
-      return eye.classList.remove("eye-hover");
+      return;
     }
 
     case "leftTarget": {
-      eye.classList.remove("eye-hover");
       
       closeSubmenu();
       
@@ -407,12 +612,19 @@ window.addEventListener("message", (event) => {
       } else {
         optionsWrapper.innerHTML = "";
       }
+
+      optionNodes = [];
+      selectedIndex = -1;
+      optionsWrapper.style.transform = 'translateY(0px)';
+      updatePointerVisibility(true);
+      positionPointerAtCenter(false);
       return;
     }
 
     case "setTarget": {
-      eye.classList.add("eye-hover");
-      
+      optionsWrapper.style.transform = 'translateY(0px)';
+      currentContainer = optionsWrapper;
+      selectedIndex = -1;
       optionsWrapper.innerHTML = "";
 
       if (options) {
@@ -430,6 +642,62 @@ window.addEventListener("message", (event) => {
           });
         }
       }
+
+      optionNodes = Array.from(document.querySelectorAll('.option-container'));
+      const defaultIdx = optionNodes.findIndex(n => {
+        const d = n.__optionData;
+        return d && d.default === true && !d.hide;
+      });
+      const firstIdx = optionNodes.findIndex(n => !n.__optionData?.hide);
+      const initialIdx = defaultIdx !== -1 ? defaultIdx : (firstIdx !== -1 ? firstIdx : 0);
+      if (optionNodes.length > 0) {
+        updatePointerVisibility(true);
+        setSelectedIndex(initialIdx, false);
+        optionsWrapper.style.transform = 'translateY(0px)';
+        positionPointerAtCenter(false);
+        centerOnSelected(false);
+      } else {
+        updatePointerVisibility(true);
+        positionPointerAtCenter(false);
+      }
+    }
+
+    case "focus": {
+      hasFocus = !!event.data.state;
+      allowSelect = false;
+      break;
+    }
+
+    case "armClick": {
+      allowSelect = hasFocus && optionNodes.length > 0;
+      break;
+    }
+
+    case "selectCurrent": {
+      if (optionNodes.length > 0) {
+        if (!isInSubmenu) {
+          allowSelect = true;
+          chooseSelected();
+          allowSelect = false;
+        } else {
+          const first = optionNodes[0];
+          if (first) first.click();
+        }
+      }
+      break;
+    }
+
+    case "scroll": {
+      allowSelect = false;
+      if (!optionNodes.length) {
+        positionPointerAtCenter(true);
+        break;
+      }
+      const dirName = event.data?.dir === 'up' ? 'up' : 'down';
+      const delta = dirName === 'up' ? -1 : 1;
+      lastScrollDir = delta;
+      setSelectedIndex(selectedIndex + delta, true);
+      break;
     }
 
     case "setTheme": {
@@ -461,9 +729,7 @@ const rippleCSS = `
     }
   }
   
-  /* Removed slideOutRight animation to prevent glitchy behavior */
   
-  /* Removed fadeOut animation to prevent glitchy behavior */
 `;
 
 const style = document.createElement('style');
@@ -474,7 +740,6 @@ document.addEventListener('DOMContentLoaded', initializeTheme);
 
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') {
-    // Send escape event to game
     fetch('https://ox_target/escape', {
       method: 'POST',
       headers: {
@@ -484,3 +749,5 @@ document.addEventListener('keydown', (event) => {
     });
   }
 });
+
+

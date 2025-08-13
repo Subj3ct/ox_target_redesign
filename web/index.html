@@ -8,21 +8,12 @@
     <title>ox_target</title>
   </head>
   <body>
-    <!-- Target Icon Container -->
-    <div id="eye" class="animate-fade-in">
-      <svg id="eyeSvg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor">
-        <!-- Outer ring -->
-        <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.6"/>
-        <!-- Middle ring -->
-        <circle cx="12" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.8"/>
-        <!-- Inner circle -->
-        <circle cx="12" cy="12" r="2" fill="currentColor"/>
-        <!-- Crosshair lines -->
-        <line x1="12" y1="2" x2="12" y2="6" stroke="currentColor" stroke-width="1.5" opacity="0.6"/>
-        <line x1="12" y1="18" x2="12" y2="22" stroke="currentColor" stroke-width="1.5" opacity="0.6"/>
-        <line x1="2" y1="12" x2="6" y2="12" stroke="currentColor" stroke-width="1.5" opacity="0.6"/>
-        <line x1="18" y1="12" x2="22" y2="12" stroke="currentColor" stroke-width="1.5" opacity="0.6"/>
+    <!-- Pointer (diamond + dashed leader) -->
+    <div id="pointer" class="animate-fade-in" aria-hidden="true">
+      <svg id="diamondSvg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18">
+        <polygon points="12,2 22,12 12,22 2,12" fill="none" stroke="currentColor" stroke-width="2"/>
       </svg>
+      <div class="pointer-leader"></div>
     </div>
     
     <!-- Options Container -->

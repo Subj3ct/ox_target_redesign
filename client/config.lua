@@ -13,7 +13,7 @@ local config = {
     },
 }
 
--- Function to get configuration value
+-- get configuration value(don't touch this)
 function config.get(key)
     local keys = {}
     for k in key:gmatch('[^%.]+') do
@@ -32,7 +32,7 @@ function config.get(key)
     return value
 end
 
--- Function to set configuration value
+-- set configuration value(don't touch this)
 function config.set(key, value)
     local keys = {}
     for k in key:gmatch('[^%.]+') do
@@ -51,7 +51,7 @@ function config.set(key, value)
     current[keys[#keys]] = value
 end
 
--- Function to merge configuration with user overrides
+-- merge configuration with user overrides(don't touch this)
 function config.merge(userConfig)
     if type(userConfig) == 'table' then
         for key, value in pairs(userConfig) do
@@ -60,5 +60,4 @@ function config.merge(userConfig)
     end
 end
 
--- Export configuration
 return config 

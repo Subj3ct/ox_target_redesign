@@ -199,17 +199,13 @@ RegisterNUICallback('submenuSelect', function(data, cb)
     
     local originalOption = nil
     if targetType == "zones" then
-        if nearbyZones and nearbyZones[zoneId] then
-            if nearbyZones[zoneId].options then
-                originalOption = nearbyZones[zoneId].options[targetId] or nearbyZones[zoneId].options[targetId - 1]
-                if nearbyZones[zoneId].options[targetId] then
-                elseif nearbyZones[zoneId].options[targetId - 1] then
-                end
-            else
-            end
+        if nearbyZones and nearbyZones[zoneId] and nearbyZones[zoneId].options then
+            originalOption = nearbyZones[zoneId].options[targetId]
         end
     else
-        originalOption = currentTarget[targetType][targetId]
+        if options and options[targetType] then
+            originalOption = options[targetType][targetId]
+        end
     end
     
     if originalOption then
@@ -409,9 +405,16 @@ local function startTargeting()
 
                 if not hasTarget or options and IsDisabledControlJustPressed(0, 25) then
                     state.setNuiFocus(false, false)
+                    sendNuiMessage('focus', { state = false })
                 end
             elseif hasTarget and IsDisabledControlJustPressed(0, mouseButton) then
-                state.setNuiFocus(true, true)
+                sendNuiMessage('selectCurrent')
+            elseif hasTarget then
+                if IsDisabledControlJustPressed(0, 241) then -- INPUT_CURSOR_SCROLL_UP
+                    sendNuiMessage('scroll', { dir = 'up' })
+                elseif IsDisabledControlJustPressed(0, 242) then -- INPUT_CURSOR_SCROLL_DOWN
+                    sendNuiMessage('scroll', { dir = 'down' })
+                end
             end
 
             Wait(0)
@@ -746,8 +749,8 @@ CreateThread(function()
 end)
 
 -- Example submenu
---[[
-exports.ox_target:addBoxZone({
+
+--[[ exports.ox_target:addBoxZone({
     coords = vec3(321.29, 565.17, 154.75),
     size = vec3(2, 2, 3),
     rotation = 45,
@@ -788,5 +791,4 @@ exports.ox_target:addBoxZone({
             }
         }
     }
-})
---]]
+}) ]]
